@@ -19,7 +19,7 @@
 
 ### 面试题(每题5分, 尽量写具体, 不写全, 分全扣!!!)
 
-1. 使用playbook剧本, 完成对 `epel-release`、`net-tools`、`vim`、`screen` , 要求使用 with_items 循环完成
+1. 使用playbook剧本, 完成对 `epel-release`、`net-tools`、`vim`、`screen` 进行安装, 要求使用 with_items 循环完成
 2. 请写出获取centos操作系统中, CPU使用率、Memory使用率、disk使用率的shell指令, 必须写全
 3. 请写出如何探测 `www.baidu.com`、`www.sina.com`、`www.hiops.icu`这三个域名首页可用性的playbook剧本
 4. 请写出如何执行playbook中某个task的指令, 并写出如何设置或如何编写的playbook剧本
