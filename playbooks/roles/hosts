@@ -1,0 +1,67 @@
+# 七层负载均衡入口
+[lb7loadbalancer]
+10.9.12.51
+[lb7loadbalancer:vars]
+logfile_path="/var/log/nginx/*.log"
+kafka_stream_name="lb7loadbalancer"
+
+[logstash-lb7loadbalancer]
+10.9.12.61
+10.9.12.62
+[logstash-lb7loadbalancer:vars]
+kafka_stream_name="lb7loadbalancer"
+
+# 前端业务
+[fronted-website]
+10.9.12.52
+10.9.12.53
+[fronted-website:vars]
+logfile_path="/var/log/nginx/*.log"
+kafka_stream_name="fronted-website"
+
+[logstash-fronted-website]
+10.9.12.61
+10.9.12.62
+[logstash-fronted-website:vars]
+kafka_stream_name="fronted-website"
+
+# 四层负载均衡入口
+[lb4loadbalancer]
+10.9.12.54
+[lb4loadbalancer:vars]
+logfile_path="/var/log/nginx/*.log"
+kafka_stream_name="lb4loadbalancer"
+
+[logstash-lb4loadbalancer]
+10.9.12.61
+10.9.12.62
+[logstash-lb4loadbalancer:vars]
+kafka_stream_name="lb4loadbalancer"
+
+# 后端支付功能业务
+[backend-payment]
+10.9.12.55
+10.9.12.56
+[backend-payment:vars]
+logfile_path="/var/log/backend/pyment/*.log"
+kafka_stream_name="backend-payment"
+
+[logstash-backend-payment]
+10.9.12.61
+10.9.12.62
+[logstash-backend-payment:vars]
+kafka_stream_name="backend-payment"
+
+# 后端库存功能业务
+[backend-stock]
+10.9.12.57
+10.9.12.58
+[backend-stock:vars]
+logfile_path="/var/log/backend/stock/*.log"
+kafka_stream_name="backend-stock"
+
+[logstash-backend-stock]
+10.9.12.61
+10.9.12.62
+[logstash-backend-stock:vars]
+kafka_stream_name="backend-stock"

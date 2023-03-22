@@ -1,0 +1,17 @@
+---
+- hosts: agent
+  vars:
+    - zabbix_server: "10.9.12.21"
+    - zabbix_repo_url: "https://repo.zabbix.com/zabbix/5.0/rhel/7/x86_64/zabbix-release-5.0-1.el7.noarch.rpm"
+  tasks:
+    - name: installer zabbix installcation repo file.
+      yum: name={{ zabbix_repo_url }} state=present
+    - name: installer zabbix-agent package.
+      yum: name=zabbix-agent state=latest
+    - name: transfer zabbix-agent.conf configfile.
+      template: src=zabbix_agent.conf.j2 dest=/etc/zabbix/zabbix_agentd.conf
+      notify:
+        - enable now zabbix-agent
+  handlers:
+    - name: enable now zabbix-agent
+      service: name=zabbix-agent state=started enabled=True

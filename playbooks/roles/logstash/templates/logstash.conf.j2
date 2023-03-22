@@ -1,0 +1,28 @@
+input {
+  kafka {
+    bootstrap_servers => "{{ kafka_machines_a }},{{ kafka_machines_b }},{{ kafka_machines_c }}"
+    auto_offset_reset => "latest"
+    topics => ["{{ kafka_stream_name }}"]
+    codec => "json"
+  }
+}
+
+filter {
+  grok {
+    match => { "message" => "%{IP:clientip} - (%{USERNAME:user}|-) \[%{HTTPDATE:timestamp}\] \"%{WORD:request_verb} %{NOTSPACE:request} HTTP/%{NUMBER:httpversion}\" %{NUMBER:status:int} %{NUMBER:body_sent:int} \"-\" \"%{GREEDYDATA:agent}\" \"-\"" }
+    remove_field => "message"
+  }
+  date {
+    match => ["timestamp", "YYYY-MM-dd HH:mm:ss,SSS"]
+    target => "@timestamp"
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => ["http://{{ elastic_machines_a }}", "http://{{ elastic_machines_b }}", "http://{{ elastic_machines_c }}"]
+    user => "elastic"
+    password => "qfcloud120.."
+    index => "{{ kafka_stream_name }}-%{+YYYY.MM.dd}"
+  }
+}

@@ -1,0 +1,5 @@
+---
+- name: transfer logstash configure file.
+  template: src=logstash.conf.j2 dest=/etc/logstash/conf.d/{{ kafka_stream_name }}-logstash.conf
+  notify:
+    - restart logstash service

@@ -1,0 +1,15 @@
+---
+- hosts: test
+  vars:
+    proj_name: "helloworld"
+    proj_url: "https://gitee.com/mirschao/helloworld.git"
+    proj_path: "/srv/apps/helloworld"
+    virtualenv_path: "/srv/envs/apps/helloword"
+    requirement_file_name: "requirements.txt"
+  tasks:
+  - name: update {{ proj_name }} project source codes.
+    git: repo={{ proj_url }} dest={{ proj_path }}
+  - name: installtaion requirements site-packages.
+    pip: requirements={{ proj_path }}/{{ requirement_file_name }} virtualenv={{ virtualenv_path }}
+  - name: restart {{ proj_name }} project.
+    supervisorctl: name={{ proj_name }} state=restarted

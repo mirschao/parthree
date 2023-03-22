@@ -1,0 +1,3 @@
+---
+- name: enable now filebeat
+  service: name=filebeat state=started enabled=True

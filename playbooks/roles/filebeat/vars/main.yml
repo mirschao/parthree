@@ -1,0 +1,4 @@
+---
+kafka_machines_a: "10.9.12.51:9092"
+kafka_machines_b: "10.9.12.52:9092"
+kafka_machines_c: "10.9.12.53:9092"

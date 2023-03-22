@@ -1,0 +1,9 @@
+---
+- name: download filebeat package to dest machines.
+  get_url: url=https://mirrors.hiops.icu/packages/filebeat-7.13.1-x86_64.rpm dest=/usr/local/src/ validate_certs=no
+- name: installer filebeat package to dest machines.
+  yum: name=/usr/local/src/filebeat-7.13.1-x86_64.rpm state=present
+- name: configure filebeat configfile to dest machines.
+  template: src=filebeat.yml.j2 dest=/etc/filebeat/filebeat.yml
+  notify:
+    - enable now filebeat

@@ -1,0 +1,23 @@
+filebeat.inputs:
+- type: log
+  enabled: true
+  tail_files: true
+  backoff: "1s"
+  paths:
+    - {{ logfile_path }}
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+setup.template.settings:
+  index.number_of_shards: 1
+setup.kibana:
+output:
+  kafka:
+    hosts: ["{{ kafka_machines_a }}", "{{ kafka_machines_b }}", "{{ kafka_machines_c }}"]
+    topic: {{ kafka_stream_name }}
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+  - add_kubernetes_metadata: ~

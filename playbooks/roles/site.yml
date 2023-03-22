@@ -1,0 +1,54 @@
+---
+- hosts: lb7loadbalancer
+  remote_user: root
+  roles:
+    - filebeat
+
+- hosts: logstash-lb7loadbalancer
+  remote_user: root
+  roles:
+    - logstash
+
+#######################################
+- hosts: fronted-website
+  remote_user: root
+  roles:
+    - filebeat
+
+- hosts: logstash-fronted-website
+  remote_user: root
+  roles:
+    - logstash
+
+#######################################
+- hosts: lb4loadbalancer
+  remote_user: root
+  roles:
+    - filebeat
+
+- hosts: logstash-lb4loadbalancer
+  remote_user: root
+  roles:
+    - logstash
+
+#######################################
+- hosts: backend-payment
+  remote_user: root
+  roles:
+    - filebeat
+
+- hosts: logstash-backend-payment
+  remote_user: root
+  roles:
+    - logstash
+
+#######################################
+- hosts: backend-stock
+  remote_user: root
+  roles:
+    - filebeat
+
+- hosts: logstash-backend-stock
+  remote_user: root
+  roles:
+    - logstash
