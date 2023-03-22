@@ -569,7 +569,7 @@ ansible_python_interpreter=/usr/local/python311/bin/virtualenv
 ### 3.2 ansible roles角色剧本编写
 
 ```bash
-$ 
+$ git clone https://github.com/mirschao/parthree.git
 $ tree roles/
 roles/
 ├── filebeat
