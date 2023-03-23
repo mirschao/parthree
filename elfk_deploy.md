@@ -332,7 +332,6 @@ $ vim /usr/lib/systemd/system/kafka.service
 Description=kafka
 Before=network-pre.target
 Wants=network-pre.target
-Documentation=files:///usr/local/kafka_2.13-3.0.0/site-docs
 
 [Service]
 ExecStart=/usr/local/kafka_2.13-3.0.0/bin/kafka-server-start.sh /usr/local/kafka_2.13-3.0.0/config/kraft/server.properties
