@@ -83,7 +83,7 @@ $ /usr/share/elasticsearch/bin/elasticsearch-keystore create
 
 #> transfer certs to location (only elastics-a)
 $ cd /usr/share/elasticsearch/
-$ mv elastic-certificates.p12 elastic-stack-ca.p12 /etc/elasticsearch/certs/
+$ cp elastic-certificates.p12 elastic-stack-ca.p12 /etc/elasticsearch/certs/
 $ scp elastic-certificates.p12 elastic-stack-ca.p12 root@10.9.12.52:/etc/elasticsearch/certs/
 $ scp elastic-certificates.p12 elastic-stack-ca.p12 root@10.9.12.53:/etc/elasticsearch/certs/
 $ scp /etc/elasticsearch/elasticsearch.keystore root@10.9.12.52:/etc/elasticsearch/
