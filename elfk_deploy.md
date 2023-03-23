@@ -261,6 +261,7 @@ path.data: /data/kibana/data
 pid.file: /run/kibana/kibana.pid
 i18n.locale: "zh-CN"
 
+$ chown -R kibana:kibana /data/kibana/
 $ systemctl enable --now kibana
 ```
 
