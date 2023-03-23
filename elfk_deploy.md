@@ -166,8 +166,6 @@ $ curl -u elastic:xxxxxx http://10.9.12.51:9200/_cat/health?v
 - 分析您的数据。搜索隐藏的见解，可视化您在图表、仪表、地图、图表等中发现的内容，并将它们组合到仪表板中。
 - 管理、监控和保护弹性堆栈。管理数据，监控Elastic Stack集群的运行状况，并控制哪些用户可以访问哪些功能。
 
-![kibana-arch](https://www.elastic.co/guide/en/kibana/current/images/analytics-home-page.png)
-
 
 
 | hostname         | ipaddress  | roles  | Configure      |
