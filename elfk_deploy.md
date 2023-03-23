@@ -10,12 +10,7 @@
 
 ---
 
-参考文档:
-
-- Kafka KRaft mode deploy: https://www.conduktor.io/kafka/how-to-install-apache-kafka-on-linux-without-zookeeper-kraft-mode/
-- Elastic search deploy cluster: https://www.elastic.co/guide/en/elasticsearch/reference/current/rpm.html
-
-
+[TOC]
 
 &emsp;&emsp;在日常运维过程中监控是很重要的, 监控又分为业务状态监控、日志数据监控两种, 对于日志而言可以反应出的指标就很多了, 而且日常排查问题也常常需要日志来辅助运维进行, 极其具备参考价值; 在现阶段而言ELK和Loki是两大日志收集阵容, ELK更加倾向于ECS主机的日志采集工作, 而Loki更加倾向于收集Kubernetes中pod的日志; 本篇主要介绍ELK的安装;
 
@@ -30,13 +25,13 @@
 - 使用Elasticsearch作为地理信息系统（GIS）管理、集成和分析空间信息
 - 使用Elasticsearch作为生物信息学研究工具存储和处理遗传数据
 
+
+
 | hostname   | ipaddress  | roles        | Configure      |
 | ---------- | ---------- | ------------ | -------------- |
 | elastics-a | 10.9.12.51 | Master, data | 4 core 4G(RAM) |
 | elastics-b | 10.9.12.52 | Master, data | 4 core 4G(RAM) |
 | elastics-c | 10.9.12.53 | Master, data | 4 core 4G(RAM) |
-
-
 
 ```bash
 #> install elasticserach package
@@ -171,6 +166,8 @@ $ curl -u elastic:xxxxxx http://10.9.12.51:9200/_cat/health?v
 - 分析您的数据。搜索隐藏的见解，可视化您在图表、仪表、地图、图表等中发现的内容，并将它们组合到仪表板中。
 - 管理、监控和保护弹性堆栈。管理数据，监控Elastic Stack集群的运行状况，并控制哪些用户可以访问哪些功能。
 
+![kibana-arch](https://www.elastic.co/guide/en/kibana/current/images/analytics-home-page.png)
+
 
 
 | hostname         | ipaddress  | roles  | Configure      |
@@ -286,8 +283,6 @@ $ systemctl enable --now kibana
 | kafka-queue-a | 10.9.12.62 | queue | 2 core 4G(RAM) |
 | kafka-queue-b | 10.9.12.63 | queue | 2 core 4G(RAM) |
 
-
-
 ```bash
 #> deploy java environment
 $ yum -y install java-11-openjdk
@@ -302,6 +297,31 @@ $ bin/kafka-storage.sh random-uuid
 ZfqgKzrHR1SqbBwOr3Iolw
 $ bin/kafka-storage.sh format -t ZfqgKzrHR1SqbBwOr3Iolw -c config/kraft/server.properties
 Formatting /tmp/kraft-combined-logs
+
+$ egrep -v "(^$|^#)" config/kraft/server.properties
+process.roles=broker,controller
+node.id=1 # 这里需要让集群中的id号不同
+controller.quorum.voters=1@localhost:9093
+listeners=PLAINTEXT://:9092,CONTROLLER://:9093
+inter.broker.listener.name=PLAINTEXT
+advertised.listeners=PLAINTEXT://localhost:9092
+controller.listener.names=CONTROLLER
+listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_SSL:SASL_SSL
+num.network.threads=3
+num.io.threads=8
+socket.send.buffer.bytes=102400
+socket.receive.buffer.bytes=102400
+socket.request.max.bytes=104857600
+log.dirs=/tmp/kraft-combined-logs
+num.partitions=1
+num.recovery.threads.per.data.dir=1
+offsets.topic.replication.factor=1
+transaction.state.log.replication.factor=1
+transaction.state.log.min.isr=1
+log.retention.hours=168
+log.segment.bytes=1073741824
+log.retention.check.interval.ms=300000
+
 $ bin/kafka-server-start.sh config/kraft/server.properties
 ```
 
@@ -323,5 +343,128 @@ StandardError=null
 
 [Install]
 WantedBy=multi-user.target
+
+$ systemctl daemon-reload
+$ systemctl enable --now kafka
+```
+
+
+
+### logstash日志管道
+
+&emsp;&emsp;Logstash 是一个具有实时流水线功能的开源数据收集引擎。Logstash 可以动态统一来自不同来源的数据，并将数据规范化到您选择的目的地。为各种高级下游分析和可视化用例清理和民主化您的所有数据。虽然 Logstash 最初推动了日志收集方面的创新，但其功能远远超出了该用例。任何类型的事件都可以通过广泛的输入、过滤器和输出插件进行丰富和转换，许多本机编解码器进一步简化了摄取过程。Logstash 通过利用更大量和更多样化的数据来加速您的洞察力
+
+| hostname             | ipaddress  | roles    | Configure      |
+| -------------------- | ---------- | -------- | -------------- |
+| logstash-pipeline-01 | 10.9.12.64 | logstash | 2 core 4G(RAM) |
+| logstash-pipeline-02 | 10.9.12.65 | logstash | 2 core 4G(RAM) |
+
+```bash
+$ rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
+$ vim /etc/yum.repos.d/logstash.repo
+[logstash-8.x]
+name=Elastic repository for 8.x packages
+baseurl=https://artifacts.elastic.co/packages/8.x/yum
+gpgcheck=1
+gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+enabled=1
+autorefresh=1
+type=rpm-md
+
+$ yum -y install logstash
+```
+
+增加管道配置文件, 作为Kafka的消费者
+
+```bash
+$ vim /etc/logstash/conf.d/currency.conf
+input {
+  kafka {
+    bootstrap_servers => "10.9.12.62:9092,10.9.12.63:9092"
+    auto_offset_reset => "latest"
+    topics => ["currency"]
+    codec => "json"
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => ["http://10.9.12.51:9200", "http://10.9.12.52:9200", "http://10.9.12.53:9200"]
+    user => "elastic"
+    password => "xxxxxx"
+    index => "currency-%{+YYYY.MM.dd}"
+  }
+}
+```
+
+```bash
+$ systemctl daemon-reload
+$ systemctl enable --now logstash
+```
+
+
+
+### filebeat 数据采集端
+
+&emsp;&emsp;Filebeat 是用于转发和集中日志数据的轻量级托运器。作为代理安装在您的服务器上，Filebeat 监控您指定的日志文件或位置，收集日志事件，并将它们转发到[Elasticsearch](https://www.elastic.co/products/elasticsearch)或 [Logstash](https://www.elastic.co/products/logstash)以进行索引。
+
+Filebeat 的工作原理如下：当您启动 Filebeat 时，它会启动一个或多个输入，这些输入会查找您为日志数据指定的位置。对于 Filebeat 找到的每个日志，Filebeat 都会启动一个收割机。每个采集器读取单个日志以获取新内容并将新日志数据发送到 libbeat，后者聚合事件并将聚合数据发送到您为 Filebeat 配置的输出。
+
+<img src="https://www.elastic.co/guide/en/beats/filebeat/current/images/filebeat.png" alt="filebeat-arch" style="zoom:50%;" />
+
+```bash
+$ cat <<-EOF >/etc/yum.repos.d/nginx.repo
+[nginx-stable]
+name=nginx stable repo
+baseurl=http://nginx.org/packages/centos/\$releasever/\$basearch/
+gpgcheck=1
+enabled=1
+gpgkey=https://nginx.org/keys/nginx_signing.key
+module_hotfixes=true
+
+[nginx-mainline]
+name=nginx mainline repo
+baseurl=http://nginx.org/packages/mainline/centos/\$releasever/\$basearch/
+gpgcheck=1
+enabled=0
+gpgkey=https://nginx.org/keys/nginx_signing.key
+module_hotfixes=true
+EOF
+
+$ yum clean all && yum makecache
+$ yum -y install nginx
+$ systemctl enable --now nginx
+```
+
+```bash
+$ rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch
+$ vim /etc/yum.repos.d/filebeat.repo
+[elastic-8.x]
+name=Elastic repository for 8.x packages
+baseurl=https://artifacts.elastic.co/packages/8.x/yum
+gpgcheck=1
+gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+enabled=1
+autorefresh=1
+type=rpm-md
+
+$ yum makecache
+$ yum -y install filebeat
+$ systemctl enable --now filebeat
+
+$ vim /etc/filebeat/filebeat.yml
+filebeat.inputs:
+ - type: log
+   tail_files: true
+   backoff: "1s"
+   paths:
+      - /var/log/nginx/*.log
+
+output:
+  kafka:
+    hosts: ["10.9.12.62:9092", "10.9.12.63:9092"]
+    topic: currency
+
+$ systemctl enable --now filebeat
 ```
 
