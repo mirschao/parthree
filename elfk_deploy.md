@@ -250,7 +250,7 @@ server.ssl.certificate: /etc/kibana/certs/fullchain1.pem
 server.ssl.key: /etc/kibana/certs/privkey1.pem
 elasticsearch.hosts: ["http://10.9.12.61:9200"]
 elasticsearch.username: 'kibana_system'
-elasticsearch.password: 'Qfcloud120..'
+elasticsearch.password: 'xxxxxx'
 logging:
   appenders:
     file:
@@ -270,3 +270,58 @@ $ systemctl enable --now kibana
 ```
 
 做好DNS解析, 并访问 `https://kibana.hiops.icu:5601/kibana`即可访问到界面, 在界面中使用 `elastic` 用户登陆即可
+
+
+
+### Kafka高性能消息队列
+
+&emsp;&emsp;在数据事件流方面，Apache Kafka 是事实上的标准。它是一个由服务器和客户端组成的开源分布式系统。Apache Kafka 主要用于构建实时数据流管道。使用 Apache Kafka 作为数据集成层，数据源会将其数据发布到 Apache Kafka，而目标系统将从 Apache Kafka 获取数据。这分离了源数据流和目标系统，允许简化数据集成解决方案。现代应用程序包括数以万计的微服务——所有这些都不断地产生日志。这些日志充满了可用于商业智能、故障预测和调试的信息。接下来的挑战是如何处理在一个地方产生的这些大量日志数据。公司将日志数据推送到数据流中以进行流处理
+
+<img src="https://www.conduktor.io/_next/image/?url=https%3A%2F%2Fimages.ctfassets.net%2Fo12xgu4mepom%2F36HRcNifBz55AUvkBs1p9x%2F31af23c93be2c7b0d1233a3f9f8797e5%2FWhat_is_Apache_Kafka_Part_1_-_Decoupling_Different_Data_Systems.png&w=3840&q=75" alt="kafka-arch" style="zoom:50%;" />
+
+
+
+| hostname      | ipaddress  | roles | Configure      |
+| ------------- | ---------- | ----- | -------------- |
+| kafka-queue-a | 10.9.12.62 | queue | 2 core 4G(RAM) |
+| kafka-queue-b | 10.9.12.63 | queue | 2 core 4G(RAM) |
+
+
+
+```bash
+#> deploy java environment
+$ yum -y install java-11-openjdk
+
+#> download kafka package
+$ wget https://archive.apache.org/dist/kafka/3.0.0/kafka_2.13-3.0.0.tgz
+
+#> deploy kafka
+$ tar xf kafka_2.13-3.0.0.tgz -C /usr/local/
+$ cd /usr/local/kafka_2.13-3.0.0/
+$ bin/kafka-storage.sh random-uuid
+ZfqgKzrHR1SqbBwOr3Iolw
+$ bin/kafka-storage.sh format -t ZfqgKzrHR1SqbBwOr3Iolw -c config/kraft/server.properties
+Formatting /tmp/kraft-combined-logs
+$ bin/kafka-server-start.sh config/kraft/server.properties
+```
+
+在测试能够正常启动后, 将上方进程放入到systemd中进行管理
+
+```bash
+$ vim /usr/lib/systemd/system/kafka.service
+[Unit]
+Description=kafka
+Before=network-pre.target
+Wants=network-pre.target
+Documentation=files:///usr/local/kafka_2.13-3.0.0/site-docs
+
+[Service]
+ExecStart=/usr/local/kafka_2.13-3.0.0/bin/kafka-server-start.sh /usr/local/kafka_2.13-3.0.0/config/kraft/server.properties
+ExecReload=/bin/kill -HUP $MAINPID
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target
+```
+
