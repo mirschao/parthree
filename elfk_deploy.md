@@ -269,3 +269,4 @@ i18n.locale: "zh-CN"
 $ systemctl enable --now kibana
 ```
 
+做好DNS解析, 并访问 `https://kibana.hiops.icu:5601/kibana`即可访问到界面, 在界面中使用 `elastic` 用户登陆即可
