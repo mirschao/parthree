@@ -133,11 +133,139 @@ $ systemctl enable --now elasticsearch
 
 ```bash
 $ /usr/share/elasticsearch/bin/elasticsearch-setup-passwords interactive
+Enter password for [elastic]:
+Enter password for [elastic]: 
+Reenter password for [elastic]: 
+Enter password for [apm_system]: 
+Reenter password for [apm_system]: 
+Enter password for [kibana_system]: 
+Reenter password for [kibana_system]: 
+Enter password for [logstash_system]: 
+Reenter password for [logstash_system]: 
+Enter password for [beats_system]: 
+Reenter password for [beats_system]: 
+Enter password for [remote_monitoring_user]: 
+Reenter password for [remote_monitoring_user]: 
+Changed password for user [apm_system]
+Changed password for user [kibana_system]
+Changed password for user [kibana]
+Changed password for user [logstash_system]
+Changed password for user [beats_system]
+Changed password for user [remote_monitoring_user]
+Changed password for user [elastic]
 ```
 
 使用浏览器或者curl验证集群正确性及是否组建成功
 
 ```bash
 $ curl -u elastic:xxxxxx http://10.9.12.51:9200/_cat/health?v
+```
+
+
+
+### Kibana可视化观测平台
+
+&emsp;&emsp;Kibana 是一个免费且开放的用户界面, 能够让您对 Elasticsearch 数据进行可视化, 并让您在 Elastic Stack 中进行导航. 您可以进行各种操作, 从跟踪查询负载, 到理解请求如何流经您的整个应用都能轻松完成. Kibana 核心产品搭载了一批经典功能：柱状图、线状图、饼图、旭日图等等。当然，您还可以搜索自己的所有文档。借助我们精选的时序数据 UI，对您 Elasticsearch 中的数据执行高级时间序列分析。您可以利用功能强大、简单易学的表达式来描述查询、转换和可视化。
+
+- 搜索、观察和保护您的数据。从发现文档到分析日志再到发现安全漏洞，Kibana是您访问这些功能和更多功能的门户。
+- 分析您的数据。搜索隐藏的见解，可视化您在图表、仪表、地图、图表等中发现的内容，并将它们组合到仪表板中。
+- 管理、监控和保护弹性堆栈。管理数据，监控Elastic Stack集群的运行状况，并控制哪些用户可以访问哪些功能。
+
+
+
+| hostname         | ipaddress  | roles  | Configure      |
+| ---------------- | ---------- | ------ | -------------- |
+| kibana-transform | 10.9.12.61 | Kibana | 2 core 2G(RAM) |
+
+```bash
+#> install kibana package
+$ rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
+$ vim /etc/yum.repos.d/kibana.repo
+[kibana-8.x]
+name=Kibana repository for 8.x packages
+baseurl=https://artifacts.elastic.co/packages/8.x/yum
+gpgcheck=1
+gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+enabled=1
+autorefresh=1
+type=rpm-md
+
+$ yum -y install kibana
+```
+
+Or 使用下方直接下载rpm包进行安装
+
+```bash
+$ wget https://artifacts.elastic.co/downloads/kibana/kibana-8.6.2-x86_64.rpm
+$ yum -y install kibana-8.6.2-x86_64.rpm
+```
+
+ 如果 Elasticsearch 集群有多个节点，分发 Kibana 节点之间请求的最简单的方法就是在 Kibana 机器上运行一个 Elasticsearch *协调（Coordinating only node）* 的节点。Elasticsearch 协调节点本质上是智能负载均衡器，也是集群的一部分，如果有需要，这些节点会处理传入 HTTP 请求，重定向操作给集群中其它节点，收集并返回结果。
+
+```bash
+$ wget https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-8.6.2-x86_64.rpm
+$ yum -y install elasticsearch-8.6.2-x86_64.rpm
+
+#> transfer elasticsearch certs
+$ scp root@10.9.12.51:/etc/elasticsearch/certs/elastic-certificates.p12 /etc/elasticsearch/certs/
+$ scp root@10.9.12.51:/etc/elasticsearch/certs/elastic-stack-ca.p12 /etc/elasticsearch/certs/
+$ scp root@10.9.12.51:/etc/elasticsearch/elasticsearch.keystore /etc/elasticsearch/
+$ chown -R elasticsearch:elasticsearch /etc/elasticsearch/
+
+#> modify elasticsearch configure file
+$ egrep -v "(^$|^#)" /etc/elasticsearch/elasticsearch.yml
+cluster.name: logging
+node.name: kibana-transform
+node.roles: [transform]
+path.data: /var/lib/elasticsearch
+path.logs: /var/log/elasticsearch
+network.host: 0.0.0.0
+http.port: 9200
+http.cors.enabled: true
+http.cors.allow-origin: '*'
+discovery.seed_hosts: ["10.9.12.51:9300", "10.9.12.52:9300", "10.9.12.53:9300"]
+xpack.security.enabled: true
+xpack.security.enrollment.enabled: true
+xpack.security.transport.ssl:
+  enabled: true
+  verification_mode: none
+  keystore.path: certs/elastic-certificates.p12
+  truststore.path: certs/elastic-certificates.p12
+http.host: 0.0.0.0
+
+$ vim /etc/elasticsearch/jvm.options
+-Xms4g
+-Xmx4g
+$ systemctl enable --now elasticsearch
+
+#> modify kibana configure file
+$ egrep -v "(^$|^#)" /etc/kibana/kibana.yml
+server.port: 5601
+server.host: "10.9.12.61"
+server.basePath: "/kibana"
+server.rewriteBasePath: true
+server.publicBaseUrl: "https://kibana.hiops.icu/kibana"
+server.ssl.enabled: true
+server.ssl.certificate: /etc/kibana/certs/fullchain1.pem
+server.ssl.key: /etc/kibana/certs/privkey1.pem
+elasticsearch.hosts: ["http://10.9.12.61:9200"]
+elasticsearch.username: 'kibana_system'
+elasticsearch.password: 'Qfcloud120..'
+logging:
+  appenders:
+    file:
+      type: file
+      fileName: /var/log/kibana/kibana.log
+      layout:
+        type: json
+  root:
+    appenders:
+      - default
+      - file
+path.data: /data/kibana/data
+pid.file: /run/kibana/kibana.pid
+i18n.locale: "zh-CN"
+
+$ systemctl enable --now kibana
 ```
 
