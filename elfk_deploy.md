@@ -211,7 +211,7 @@ $ chown -R elasticsearch:elasticsearch /etc/elasticsearch/
 $ egrep -v "(^$|^#)" /etc/elasticsearch/elasticsearch.yml
 cluster.name: logging
 node.name: kibana-transform
-node.roles: [transform]
+node.roles: [ ]
 path.data: /var/lib/elasticsearch
 path.logs: /var/log/elasticsearch
 network.host: 0.0.0.0
@@ -243,7 +243,7 @@ server.publicBaseUrl: "https://kibana.hiops.icu/kibana"
 server.ssl.enabled: true
 server.ssl.certificate: /etc/kibana/certs/fullchain1.pem
 server.ssl.key: /etc/kibana/certs/privkey1.pem
-elasticsearch.hosts: ["http://10.9.12.61:9200"]
+elasticsearch.hosts: ["http://localhost:9200"]
 elasticsearch.username: 'kibana_system'
 elasticsearch.password: 'xxxxxx'
 logging:
@@ -262,6 +262,7 @@ pid.file: /run/kibana/kibana.pid
 i18n.locale: "zh-CN"
 
 $ chown -R kibana:kibana /data/kibana/
+$ chown -R kibana:kibana /etc/kibana/certs/
 $ systemctl enable --now kibana
 ```
 
@@ -294,16 +295,14 @@ $ tar xf kafka_2.13-3.0.0.tgz -C /usr/local/
 $ cd /usr/local/kafka_2.13-3.0.0/
 $ bin/kafka-storage.sh random-uuid
 ZfqgKzrHR1SqbBwOr3Iolw
-$ bin/kafka-storage.sh format -t ZfqgKzrHR1SqbBwOr3Iolw -c config/kraft/server.properties
-Formatting /tmp/kraft-combined-logs
 
 $ egrep -v "(^$|^#)" config/kraft/server.properties
 process.roles=broker,controller
-node.id=1 # 这里需要让集群中的id号不同
-controller.quorum.voters=1@localhost:9093
+node.id=1 # 每个节点的id不同
+controller.quorum.voters=1@10.9.12.62:9093,2@10.9.12.63:9093 # {id}@{ipaddress}:{port} 节点间用逗号分隔
 listeners=PLAINTEXT://:9092,CONTROLLER://:9093
 inter.broker.listener.name=PLAINTEXT
-advertised.listeners=PLAINTEXT://localhost:9092
+advertised.listeners=PLAINTEXT://10.9.12.62:9092 # 当前节点的IP地址
 controller.listener.names=CONTROLLER
 listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_SSL:SASL_SSL
 num.network.threads=3
@@ -320,6 +319,9 @@ transaction.state.log.min.isr=1
 log.retention.hours=168
 log.segment.bytes=1073741824
 log.retention.check.interval.ms=300000
+
+$ bin/kafka-storage.sh format -t ZfqgKzrHR1SqbBwOr3Iolw -c config/kraft/server.properties
+Formatting /tmp/kraft-combined-logs
 
 $ bin/kafka-server-start.sh config/kraft/server.properties
 ```
@@ -346,6 +348,19 @@ $ systemctl daemon-reload
 $ systemctl enable --now kafka
 ```
 
+测试kafka服务是否能够正常写入topic
+
+```bash
+$ bin/kafka-topics.sh --create \
+--replication-factor 1 \
+--partitions 1 \
+--topic test \
+--bootstrap-server 10.9.12.62:9092
+Created topic test.
+```
+
+
+
 
 
 ### logstash日志管道
@@ -370,6 +385,13 @@ autorefresh=1
 type=rpm-md
 
 $ yum -y install logstash
+```
+
+Or 下载logstash的rpm进行安装
+
+```bash
+$ wget https://artifacts.elastic.co/downloads/logstash/logstash-8.6.2-x86_64.rpm
+$ yum -y install logstash-8.6.2-x86_64.rpm
 ```
 
 增加管道配置文件, 作为Kafka的消费者
