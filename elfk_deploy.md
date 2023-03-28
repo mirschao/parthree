@@ -361,8 +361,6 @@ Created topic test.
 
 
 
-
-
 ### logstash日志管道
 
 &emsp;&emsp;Logstash 是一个具有实时流水线功能的开源数据收集引擎。Logstash 可以动态统一来自不同来源的数据，并将数据规范化到您选择的目的地。为各种高级下游分析和可视化用例清理和民主化您的所有数据。虽然 Logstash 最初推动了日志收集方面的创新，但其功能远远超出了该用例。任何类型的事件都可以通过广泛的输入、过滤器和输出插件进行丰富和转换，许多本机编解码器进一步简化了摄取过程。Logstash 通过利用更大量和更多样化的数据来加速您的洞察力
@@ -402,6 +400,7 @@ input {
   kafka {
     bootstrap_servers => "10.9.12.62:9092,10.9.12.63:9092"
     auto_offset_reset => "latest"
+    group_id => "currencys"
     topics => ["currency"]
     codec => "json"
   }
@@ -456,6 +455,8 @@ $ yum -y install nginx
 $ systemctl enable --now nginx
 ```
 
+安装filebeat采集工具
+
 ```bash
 $ rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch
 $ vim /etc/yum.repos.d/filebeat.repo
@@ -471,19 +472,49 @@ type=rpm-md
 $ yum makecache
 $ yum -y install filebeat
 $ systemctl enable --now filebeat
+```
 
+配置采集 nginx 服务器的日志
+
+```bash
 $ vim /etc/filebeat/filebeat.yml
 filebeat.inputs:
  - type: log
    tail_files: true
    backoff: "1s"
    paths:
-      - /var/log/nginx/*.log
+      - /var/log/nginx/access.log
 
 output:
   kafka:
     hosts: ["10.9.12.62:9092", "10.9.12.63:9092"]
     topic: currency
+
+$ egrep -v "(^$|^#|#)" /etc/filebeat/filebeat.yml
+filebeat.inputs:
+- type: log
+  tail_files: true
+  backoff: "1s"
+  id: nginx-logstream-access
+  enabled: true
+  paths:
+    - /var/log/nginx/access.log
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+setup.template.settings:
+  index.number_of_shards: 1
+setup.kibana:
+output:
+  kafka:
+    hosts: ["10.9.12.62:9092", "10.9.12.63:9092"]
+    topic: currency
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+  - add_kubernetes_metadata: ~
 
 $ systemctl enable --now filebeat
 ```
