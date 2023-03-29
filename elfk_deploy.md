@@ -274,7 +274,7 @@ $ systemctl enable --now kibana
 
 &emsp;&emsp;在数据事件流方面，Apache Kafka 是事实上的标准。它是一个由服务器和客户端组成的开源分布式系统。Apache Kafka 主要用于构建实时数据流管道。使用 Apache Kafka 作为数据集成层，数据源会将其数据发布到 Apache Kafka，而目标系统将从 Apache Kafka 获取数据。这分离了源数据流和目标系统，允许简化数据集成解决方案。现代应用程序包括数以万计的微服务——所有这些都不断地产生日志。这些日志充满了可用于商业智能、故障预测和调试的信息。接下来的挑战是如何处理在一个地方产生的这些大量日志数据。公司将日志数据推送到数据流中以进行流处理
 
-<img src="https://www.conduktor.io/_next/image/?url=https%3A%2F%2Fimages.ctfassets.net%2Fo12xgu4mepom%2F36HRcNifBz55AUvkBs1p9x%2F31af23c93be2c7b0d1233a3f9f8797e5%2FWhat_is_Apache_Kafka_Part_1_-_Decoupling_Different_Data_Systems.png&w=3840&q=75" alt="kafka-arch" style="zoom:50%;" />
+<img src="https://www.conduktor.io/_next/image/?url=https%3A%2F%2Fimages.ctfassets.net%2Fo12xgu4mepom%2F36HRcNifBz55AUvkBs1p9x%2F31af23c93be2c7b0d1233a3f9f8797e5%2FWhat_is_Apache_Kafka_Part_1_-_Decoupling_Different_Data_Systems.png&w=3840&q=75" alt="kafka-arch" style="zoom: 25%;" />
 
 
 
@@ -392,7 +392,7 @@ $ wget https://artifacts.elastic.co/downloads/logstash/logstash-8.6.2-x86_64.rpm
 $ yum -y install logstash-8.6.2-x86_64.rpm
 ```
 
-增加管道配置文件, 作为Kafka的消费者
+增加管道配置文件, 作为Kafka的消费者, 这里简单的使用输入和输出作为logstash的管道, 也可以加入filter进行过滤, 但需要准备很多基础的正则表达式知识, 在后续的文件中会有介绍;
 
 ```bash
 $ vim /etc/logstash/conf.d/currency.conf
@@ -432,6 +432,7 @@ Filebeat 的工作原理如下：当您启动 Filebeat 时，它会启动一个�
 <img src="https://www.elastic.co/guide/en/beats/filebeat/current/images/filebeat.png" alt="filebeat-arch" style="zoom:50%;" />
 
 ```bash
+#> 准备被采集日志的服务, 这里用nginx作为被采集服务
 $ cat <<-EOF >/etc/yum.repos.d/nginx.repo
 [nginx-stable]
 name=nginx stable repo
@@ -455,7 +456,7 @@ $ yum -y install nginx
 $ systemctl enable --now nginx
 ```
 
-安装filebeat采集工具
+&emsp;&emsp;安装filebeat采集工具, 这里采用yum的方式进行安装; 后续如果机器多的情况下可以使用ansible批量安装, 但要考虑到logstash的topic是否与filebeat匹配的问题, kafka作为中间的队列服务所产生的topic由filebeat决定;
 
 ```bash
 $ rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch
@@ -474,7 +475,7 @@ $ yum -y install filebeat
 $ systemctl enable --now filebeat
 ```
 
-配置采集 nginx 服务器的日志
+&emsp;&emsp;配置采集 nginx 服务器的日志, 并设定filebeat配置文件的采集源(/var/log/nginx/access.log)及输送源(Kafka), 这里filebeat使用单一的日志源作为采集源, 也可以使用正则表达式的方式来匹配不同类型、不同虚拟主机的日志, 同样的Kafka的topic也可以自动的生成对应的topic从而再经过配置logstash来输送数据到elasticsearch中进行存储
 
 ```bash
 $ vim /etc/filebeat/filebeat.yml
