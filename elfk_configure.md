@@ -64,7 +64,7 @@ ELK的缺点也是明显的, 部署这样一套日志分析系统, 不论是存�
 
 ---
 
-### 1. filebeat配置采集规则
+### 1. Filebeat 配置采集规则
 
 &emsp;&emsp;Filebeat在业务服务器或k8s的node节点中有可能采集的数据源并不止一个, 所以往往需要配置多个数据源(input), 这时向kafka中创建topic就成了问题, 每个数据源所创建的topic是不一样的, 如何让filebeat所创建的topic与filebeat所采集的数据源一对一就成了必要解决的问题, 对于该类问题可以采用 field 字段进行解决下面为详细的配置文件
 
@@ -137,3 +137,175 @@ output {
 ```
 
 <img src="./images/filebeat-kafka-logstash-config.png" alt="filebeat-kafka-logtash-config" style="zoom:50%;" />
+
+### 2. Filebeat 批量部署及配置
+
+&emsp;&emsp;在正常的业务场景中, 由于上线新的模块或者服务就需要对filebeat的配置文件进行修改或者创建, 以及对于新机器中要进行部署和安装filebeat; 基于以上需求对于配置文件的修改和创建可以采用两种方式: `filebeat配置修改动作集成到运维平台中`、`ansible使用jinjia2模版进行替换`; 对于需要新部署的业务机器采集日志可以采用`ansible部署并配置filebeat`
+
+需求a: ansible使用jinjia2修改配置文件
+
+```yaml
+#> hosts文件:
+[businessName]
+10.9.12.[31:39]
+[businessName:vars]
+bname = "shequ"
+
+#> playbook文件:
+- hosts: businessName
+  tasks:
+    - name: insert new log source to old filebeat configure file.
+      lineinfile:
+        dest: '/path/to/dir/filebeat.yml'
+        insertbefore: 'filebeat.config.modules'
+        line: "{{ item }}"
+      with_items:
+        - '- type: log'
+        - '  tail_files: true'
+        - '  backoff: 1s'
+        - '  id: logstream-{{ bname }}'
+        - '  enabled: true'
+        - '  paths:'
+        - '    - /path/to/dir/xxx.log'
+        - '  fields:'
+        - '    log_topic: {{ bname }}'
+      notify: 'restart filebeat service'
+  handlers:
+    - name: restart filebeat service
+      service:
+        name: filebeat
+        state: restarted
+      listen: 'restart filebeat service'
+```
+
+
+
+需求b: ansible部署并配置filebeat在新业务机器中
+
+```yaml
+#> 模版文件:
+$ vim filebeat.yml
+[elastic-8.x]
+name=Elastic repository for 8.x packages
+baseurl=https://artifacts.elastic.co/packages/8.x/yum
+gpgcheck=1
+gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+enabled=1
+autorefresh=1
+type=rpm-md
+
+$ vim filebeat.j2
+filebeat.inputs:
+- type: log
+  tail_files: true
+  backoff: "1s"
+  id: {{ logstream-id }}
+  enabled: true
+  paths:
+    - {{ logfile-path }}
+  fields:
+    log_topic: "{{ topic-name }}"
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+setup.template.settings:
+  index.number_of_shards: 1
+setup.kibana:
+output:
+  kafka:
+    hosts: ["{{ kafka-pipeline-a }}:9092", "{{ kafka-pipeline-b }}:9092"]
+    topic: '%{[fields.log_topic]}'
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+  - add_kubernetes_metadata: ~
+
+#> hosts文件:
+[newbusiness]
+10.9.12.[31:39]
+[newbusiness:vars]
+newbusiness_name = "luntan"
+
+#> playbook文件:
+- hosts: newbusiness
+  vars:
+    - logstream-id: "business-name-id"
+    - logfile-path: "/var/log/nginx/access.log"
+    - topic-name: "business-name"
+    - kafka-pipeline-a: "10.9.12.62"
+    - kafka-pipeline-b: "10.9.12.63"
+  tasks:
+    - name: configure filebeat install repo.
+      copy:
+        src: filebeat.yml
+        dest: /etc/yum.repos.d/filebeat.yml
+    - name: install filebeat process service.
+      yum:
+        name: filebeat
+        state: latest
+    - name: configure filebeat configure file.
+      template:
+        src: filebeat.j2
+        dest: /etc/filebeat/filebeat.yml
+      notify: "enable now filebeat"
+  handlers:
+    - name: enable now filebeat
+      service:
+        name: filebeat
+        state: started
+        enabled: True
+      listen: "enable now filebeat"
+```
+
+
+
+### 3. Logstash 的过滤管道
+
+&emsp;&emsp;对于日志收集而言, 并不是所有的日志数据均是被我们需要的, 有些不必要的字段可以被我们使用logstash的filter模块过滤掉, 从而减少对ES的存储压力, 进而也能将日志存储成我们想要的模式和结构; 进而在处理日志的过程中更加得心应手; 
+
+&emsp;&emsp;logstash的filter模块中可以使用munte增加字段到数据中, 也可以使用grok对日志数据进行结构化过滤进而提取出来有价值的数据, 从而输出到ES中进行存储; 对于logstash而言Grok是将非结构化日志数据解析为结构化和可查询数据的好方法, 默认情况下，Logstash 附带大约 120 种模式。可以在这里找到它们： https://github.com/logstash-plugins/logstash-patterns-core/tree/master/patterns
+
+```json
+#> nginx access日志文件单条内容如下:
+10.9.127.254 - - [31/Mar/2023:13:58:45 +0800] "GET /favicon.ico HTTP/1.1" 404 555 "http://10.9.12.71/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36" "-"
+```
+
+打开 grok debugger 界面, 对上述日志文件进行模式匹配并命名新的字段名称; https://kibana.hiops.icu:5601/kibana/app/dev_tools#/grokdebugger 注意更换URL中的二级域名;
+
+![grok-debugger](images/grok.png)根据上方生成的各个匹配模式即可构成如下的logstash配置文件; filter中使用grok进行过滤即可
+
+在 `/usr/share/logstash/vendor/bundle/jruby/2.6.0/gems/logstash-patterns-core-4.3.4/patterns` 中创建 `nginx` 文件, 并在其中增加如下正则表达式:
+
+```reStructuredText
+ACCESS %{IP:clentip} - (%{USERNAME:remote_user}|-) \[%{HTTPDATE:timestamp}\] "%{WORD:request_method} %{URIPATHPARAM:request_uri} %{NOTSPACE:version}" %{NUMBER:requests_status_code} %{NUMBER:request_body_bytes} "%{URI:request_url}" "%{GREEDYDATA:request_agent}" "%{IP:request_rewrite_to}"
+```
+
+在 `/etc/logstash/conf.d/test-grok.conf` 中增加以下配置, 用于测试
+
+```json
+#> 准备logstash的测试配置文件, 用于测试解析日志数据
+input {
+  stdin {}
+}
+
+filter {
+  grok {
+    patterns => "/usr/share/logstash/vendor/bundle/jruby/2.6.0/gems/logstash-patterns-core-4.3.4/patterns"
+    match => { "message" => "%{NGINXACCESS}" }
+  }
+}
+
+output {
+  stdout {}
+}
+```
+
+执行 `/usr/share/logstash/bin/logstash -f /etc/logstash/conf.d/test-grok.conf` 在启动成功后将下方的日志数据放入到标准输入中, 查看是否能生成对应的字段数据; 以下数据为标准nginx日志文件数据
+
+```nginx
+10.9.127.254 - - [31/Mar/2023:13:58:45 +0800] "GET /favicon.ico HTTP/1.1" 404 555 "http://10.9.12.71/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36" "-"
+```
+
+![logstash-filter-config](images/grok-result.png)
