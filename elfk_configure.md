@@ -261,6 +261,184 @@ newbusiness_name = "luntan"
 
 
 
+⚠️根据日常工作过程中, 对于小架构(200～300台业务机器), filebeat可以直接写入数据到ES集群, 并采用结构化数据形式; 所采用的就是filebeat + elasticsearch + kibana的结构进行采集日志; 而在filbeat中可以采用pipeline的形式以及codec的形式将日志进行过滤和结构化, 从而达到替代logstash的作用, 也能减少日志采集的机器压力, 提高效率; 整体流程如下:
+
+- 通过kibana的开发工具，在es中进行添加 pipeline,当然你也可以使用es的api进行添加
+- 在filebeat中定义使用的pipeline名称
+- 当filebeat采集到数据后，直接发往es,es进行入库前的pipeline处理
+
+示例日志如下：
+
+```log
+2023-04-21 00:00:07.115 [HUB "hub_dkwbj"] Session "SID-BRIDGE-5": A large volume of broadcast packets has been detected. There are cases where packets are discarded based on the policy. The source MAC address is 50-9A-4C-27-F9-D3, the source IP address is fe80::e8d3:8281:e69e:afda, the destination IP address is ff02::1:3. The number of broadcast packets is equal to or larger than 32 items per 1 second (note this information is the result of mechanical analysis of part of the packets and could be incorrect).
+2023-04-21 00:00:07.115 [HUB "hub_dkwbj"] Session "SID-BRIDGE-5": A large volume of broadcast packets has been detected. There are cases where packets are discarded based on the policy. The source MAC address is 50-9A-4C-27-F9-D3, the source IP address is 192.168.9.103, the destination IP address is 224.0.0.252. The number of broadcast packets is equal to or larger than 32 items per 1 second (note this information is the result of mechanical analysis of part of the packets and could be incorrect).
+2023-04-21 00:01:34.923 [HUB "hub_dkwbj"] Session "SID-BRIDGE-5": A large volume of broadcast packets has been detected. There are cases where packets are discarded based on the policy. The source MAC address is 50-9A-4C-27-F9-D3, the source IP address is 192.168.9.103, the destination IP address is 224.0.0.251. The number of broadcast packets is equal to or larger than 40 items per 1 second (note this information is the result of mechanical analysis of part of the packets and could be incorrect).
+2023-04-21 00:01:34.923 [HUB "hub_dkwbj"] Session "SID-BRIDGE-5": A large volume of broadcast packets has been detected. There are cases where packets are discarded based on the policy. The source MAC address is 50-9A-4C-27-F9-D3, the source IP address is fe80::e8d3:8281:e69e:afda, the destination IP address is ff02::fb. The number of broadcast packets is equal to or larger than 40 items per 1 second (note this information is the result of mechanical analysis of part of the packets and could be incorrect).
+2023-04-21 00:03:48.133 [HUB "hub_dkwbj"] Session "SID-BRIDGE-5": A large volume of broadcast packets has been detected. There are cases where packets are discarded based on the policy. The source MAC address is 48-4D-7E-BE-B0-87, the source IP address is 192.168.9.21, the destination IP address is 224.0.0.251. The number of broadcast packets is equal to or larger than 52 items per 1 second (note this information is the result of mechanical analysis of part of the packets and could be incorrect).
+2023-04-21 00:03:48.133 [HUB "hub_dkwbj"] Session "SID-BRIDGE-5": A large volume of broadcast packets has been detected. There are cases where packets are discarded based on the policy. The source MAC address is 48-4D-7E-BE-B0-87, the source IP address is fe80::c129:65df:e7de:f745, the destination IP address is ff02::fb. The number of broadcast packets is equal to or larger than 52 items per 1 second (note this information is the result of mechanical analysis of part of the packets and could be incorrect).
+2023-04-21 00:03:48.133 [HUB "hub_dkwbj"] Session "SID-BRIDGE-5": A large volume of broadcast packets has been detected. There are cases where packets are discarded based on the policy. The source MAC address is 50-9A-4C-27-F9-D3, the source IP address is 192.168.9.103, the destination IP address is 224.0.0.251. The number of broadcast packets is equal to or larger than 60 items per 1 second (note this information is the result of mechanical analysis of part of the packets and could be incorrect).
+2023-04-21 00:03:48.133 [HUB "hub_dkwbj"] Session "SID-BRIDGE-5": A large volume of broadcast packets has been detected. There are cases where packets are discarded based on the policy. The source MAC address is 50-9A-4C-27-F9-D3, the source IP address is fe80::e8d3:8281:e69e:afda, the destination IP address is ff02::fb. The number of broadcast packets is equal to or larger than 60 items per 1 second (note this information is the result of mechanical analysis of part of the packets and could be incorrect).
+2023-04-21 00:11:07.141 On the TCP Listener (Port 5555), a Client (IP address 167.248.133.58, Host name "scanner-09.ch1.censys-scanner.com", Port number 40418) has connected.
+2023-04-21 00:11:07.141 For the client (IP address: 167.248.133.58, host name: "scanner-09.ch1.censys-scanner.com", port number: 40418), connection "CID-8671" has been created.
+2023-04-21 00:11:08.058 Connection "CID-8671" has been terminated.
+2023-04-21 00:11:08.058 The connection with the client (IP address 167.248.133.58, Port number 40418) has been disconnected.
+2023-04-21 00:11:08.289 On the TCP Listener (Port 5555), a Client (IP address 167.248.133.58, Host name "scanner-09.ch1.censys-scanner.com", Port number 34038) has connected.
+2023-04-21 00:11:08.289 For the client (IP address: 167.248.133.58, host name: "scanner-09.ch1.censys-scanner.com", port number: 34038), connection "CID-8672" has been created.
+2023-04-21 00:11:08.531 SSL communication for connection "CID-8672" has been started. The encryption algorithm name is "AES128-SHA".
+2023-04-21 00:11:10.011 Connection "CID-8672" terminated by the cause "A client which is non-SoftEther VPN software has connected to the port." (code 5).
+```
+
+Filebeat 定义输出到 elasticsearch 的 pipeline:
+
+```yaml
+filebeat.inputs:
+- type: filestream
+  enabled: true
+  paths:
+    - /usr/share/filebeat/logfiles/*.log
+  include_lines: ['A large volume of broadcast packets has been detected']
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: true
+  reload.period: 10s
+setup.ilm.enabled: false
+setup.template.name: "vpn-log"
+setup.template.pattern: "vpn-log-*"
+output.elasticsearch:
+  index: "vpn-log-%{+yyyy-MM-dd}"
+  hosts: ["10.8.99.34:9200"]
+  username: "elastic"
+  password: "XXX"
+  pipeline: "vpn_log_pipeline"
+processors:
+- drop_fields:
+    fields:
+    - agent.ephemeral_id
+    - agent.hostname
+    - agent.id
+    - agent.type
+    - agent.version
+    - ecs.version
+    - input.type
+    - log.offset
+    - version
+```
+
+在kibana的开发工具进行创建pipeline处理, 按如下步骤对pipeline进行测试:
+
+![test-pipeline-data](images/filebeat-pipeline-test-data.png)
+
+```json
+// 上方测试过程的源码:
+POST _ingest/pipeline/_simulate
+{
+  "pipeline": {
+    "description" : "vpn_log_pipeline",
+    "processors" : [
+      {
+        "grok" : {
+          "field" : "message",
+          "patterns" : [
+            """%{TIMESTAMP_ISO8601:error_time} \[HUB "%{NOTSPACE:hub}"\] Session "%{NOTSPACE:session}": A large volume of broadcast packets has been detected. There are cases where packets are discarded based on the policy. The source MAC address is %{NOTSPACE:mac_address}, the source IP address is %{IPV4:source_ip}, the destination IP address is %{IPV4:destination_ip}. The number of broadcast packets is equal to or larger than %{NUMBER:items_per_second} items per 1 second """
+          ],
+          "ignore_failure" : true
+        },
+        "convert" : {
+          "field" : "items_per_second",
+          "type" : "integer",
+          "ignore_failure" : true
+        }
+      },
+      {
+        "date" : {
+          "field" : "error_time",
+          "target_field" : "@timestamp",
+          "formats" : [
+            "yyyy-MM-dd HH:mm:ss.SSS"
+          ],
+          "timezone" : "Asia/Shanghai"
+        }
+      }
+    ]
+  },
+  "docs": [
+    {
+      "_source": {
+        "message": """2022-01-17 14:19:07.047 [HUB "hub_dkwbj"] Session "SID-BRIDGE-20": A large volume of broadcast packets has been detected. There are cases where packets are discarded based on the policy. The source MAC address is 70-B5-E8-2F-C9-5C, the source IP address is 192.168.9.134, the destination IP address is 0.0.0.0. The number of broadcast packets is equal to or larger than 34 items per 1 second (note this information is the result of mechanical analysis of part of the packets and could be incorrect)."""
+      }
+    }
+  ]
+}
+```
+
+在上方测试正常的情况下, 使用kibana的开发工具, 将elasticsearch的pipeline配置, 增加到elastic中:
+
+![add-filebeat-pipeline](images/add-filebeat-pipeline-config.png)
+
+```json
+#> 上方配置源码:
+// 增加pipeline
+PUT _ingest/pipeline/vpn_log_pipeline
+{
+  "description": "vpn_log_pipeline",
+  "processors": [
+    {
+      "grok": {
+        "field": "message",
+        "patterns": [
+          "%{TIMESTAMP_ISO8601:error_time} \\[HUB \"%{NOTSPACE:hub}\"\\] Session \"%{NOTSPACE:session}\": A large volume of broadcast packets has been detected. There are cases where packets are discarded based on the policy. The source MAC address is %{NOTSPACE:mac_address}, the source IP address is %{IP:source_ip}, the destination IP address is %{IP:destination_ip}. The number of broadcast packets is equal to or larger than %{NUMBER:items_per_second} items per 1 second "
+        ],
+        "ignore_failure": true
+      },
+      "convert": {
+        "field": "items_per_second",
+        "type": "integer",
+        "ignore_failure": true
+      }
+    },
+    {
+      "date": {
+        "field": "error_time",
+        "target_field": "@timestamp",
+        "formats": [
+          "yyyy-MM-dd HH:mm:ss.SSS"
+        ],
+        "timezone": "Asia/Shanghai"
+      }
+    }
+  ]
+}
+
+// 其他操作
+GET _ingest/pipeline/vpn_log_pipeline
+DELETE _ingest/pipeline/vpn_log_pipeline
+```
+
+
+
+测试pipeline是否能正常解析, 并存储到ES集群中:
+
+![test-added-pipeline-config](images/test-filebeat-pipeline-config.png)
+
+```json
+// 上方配置的源代码:
+//模拟测试添加的pipeline
+GET _ingest/pipeline/vpn_log_pipeline/_simulate
+{
+  "docs": [
+    {
+      "_source": {
+        "message": """2022-01-17 14:19:07.047 [HUB "hub_dkwbj"] Session "SID-BRIDGE-20": A large volume of broadcast packets has been detected. There are cases where packets are discarded based on the policy. The source MAC address is 70-B5-E8-2F-C9-5C, the source IP address is 192.168.9.134, the destination IP address is 0.0.0.0. The number of broadcast packets is equal to or larger than 34 items per 1 second (note this information is the result of mechanical analysis of part of the packets and could be incorrect)."""
+      }
+    }
+  ]
+}
+```
+
+开启filebeat, 日志文件将传输到es并通过pipeline进行处理, 其中pipeline中使用了processors的grok, 与logstash相似
+
+
+
 ### 3. Logstash 的过滤管道
 
 &emsp;&emsp;对于日志收集而言, 并不是所有的日志数据均是被我们需要的, 有些不必要的字段可以被我们使用logstash的filter模块过滤掉, 从而减少对ES的存储压力, 进而也能将日志存储成我们想要的模式和结构; 进而在处理日志的过程中更加得心应手; 
