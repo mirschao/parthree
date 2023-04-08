@@ -400,3 +400,58 @@ zabbix-server设置自动注册主机, 参考 `operators/auto_add_agent_host.md`
 
 
 
+```yaml
+---
+- hosts: zabbix-agents
+  vars:
+    - zabbix_server_ipaddress: "172.16.91.11"
+  tasks:
+    - name: download zabbix install repo rpm package.
+      get_url:
+        url: https://repo.zabbix.com/zabbix/....../zabbix-release-5.0-1.el7.noarch.rpm
+        dest: /opt
+    - name: deploy zabbix install repo rpm package.
+      yum:
+        name: /opt/zabbix-release-5.0-1.el7.noarch.rpm
+        state: present
+    - name: installer zabbix-agent package.
+      yum:
+        name: zabbix-agent
+        state: latest
+    - name: transfer zabbix-agent.conf configfile.
+      template:
+        src: zabbix_agent.conf.j2
+        dest: /etc/zabbix/zabbix_agentd.conf
+      notify:
+        - enable now zabbix-agent
+  handlers:
+    - name: enable now zabbix-agent
+      service:
+        name: zabbix-agent
+        state: started
+        enabled: True
+```
+
+```jinja2
+PidFile=/var/run/zabbix/zabbix_agentd.pid
+LogFile=/var/log/zabbix/zabbix_agentd.log
+LogFileSize=0
+Server={{ zabbix_server_ipaddress }}
+ServerActive={{ zabbix_server_ipaddress }}
+HostMetadataItem=system.uname
+Include=/etc/zabbix/zabbix_agentd.d/*.conf
+```
+
+```ini
+[zabbix-agents]
+172.16.91.[2:254]
+[zabbix-agents:vars]
+ansible_ssh_user=root
+ansible_ssh_pass=password
+ansible_ssh_private_key_file=/path/to/your/.ssh/id_rsa # 私钥
+```
+
+执行 `ansible-playbook -i hosts main.yml` 即可将目标主机安装好 zabbix-agent, 配合server端做好的自动注册, 每启动一台 zabbix-agent 即可注册到server平台
+
+
+
