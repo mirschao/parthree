@@ -354,6 +354,10 @@ listen.acl_users = apache,nginx
 # systemctl enable --now zabbix-server zabbix-agent rh-nginx116-nginx rh-php72-php-fpm
 ```
 
+访问 域名 进入zabbix设置界面, 管理员账号 Admin 密码: zabbix;
+
+![zabbix-dashboard](images/zabbix-dashboard.png)
+
 **f. 部署agent端** (针对被监控主机)
 
 ```bash
@@ -361,5 +365,38 @@ listen.acl_users = apache,nginx
 
 # yum -y install zabbix-agent
 # egrep -v "(^$|^#)" /etc/zabbix/zabbix_agentd.conf
+PidFile=/var/run/zabbix/zabbix_agentd.pid
+LogFile=/var/log/zabbix/zabbix_agentd.log
+LogFileSize=0
+Server=172.16.91.11
+ServerActive=172.16.91.11
+Hostname=zabbix-agent-a
+Include=/etc/zabbix/zabbix_agentd.d/*.conf
+
+# systemctl enable --now zabbix-agent
 ```
+
+Zabbix-server中手动添加主机, 参考 `operators/manual_add_agent_host.md` 如果Markdown文档失效可查看pdf文件
+
+
+
+```bash
+# rpm -Uvh https://repo.zabbix.com/zabbix/5.0/rhel/7/x86_64/zabbix-release-5.0-1.el7.noarch.rpm
+
+# yum -y install zabbix-agent
+# egrep -v "(^$|^#)" /etc/zabbix/zabbix_agentd.conf
+PidFile=/var/run/zabbix/zabbix_agentd.pid
+LogFile=/var/log/zabbix/zabbix_agentd.log
+LogFileSize=0
+Server=172.16.91.11
+ServerActive=172.16.91.11
+HostMetadataItem=system.uname
+Include=/etc/zabbix/zabbix_agentd.d/*.conf
+
+# systemctl enable --now zabbix-agent
+```
+
+zabbix-server设置自动注册主机, 参考 `operators/auto_add_agent_host.md` 如果Markdown文档失效可查看pdf文件
+
+
 
