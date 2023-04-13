@@ -477,6 +477,10 @@ ansible_ssh_private_key_file=/path/to/your/.ssh/id_rsa # 私钥
 | 用户体验指标 | 衡量用户在使用系统时的体验和满意度, 包括页面加载时间、页面渲染时间、交互响应时间等 |
 | 业务指标     | 衡量系统对业务的贡献, 包括销售额、转化率、市场份额等         |
 
+按照上表来说可创建四类基础监控模版, 分别为基础设施监控模版(basic-monitor-template)、应用程序监控模版(application-monitor-template)、用户体验监控模版(user-usage-monitor-template)、业务监控模版(business-monitor-template) 并将四个模版都创建在`hiopsicu` 组内, 并且组内设置好几台测试主机
+
+
+
 基础设施指标:
 
 | 类型   | 指标           | 说明                                                         |
@@ -505,7 +509,7 @@ ansible_ssh_private_key_file=/path/to/your/.ssh/id_rsa # 私钥
 | 错误率       | 错误率是指发生错误的请求数与总请求数之间的比率, 它通常以百分比表示, 较低的错误率表示应用程序的稳定性和可靠性更高. |
 | 并发数       | 并发数是指同时处理的请求数量, 如果应用程序无法处理大量并发请求, 则会导致响应延迟和性能下降. |
 
-在zabbix中可以使用自定义监控模版的方式进行监控, 其中会涉及到编写shell脚本来进行指标的收集
+在zabbix中可以使用自定义监控模版的方式进行监控, 其中会涉及到编写shell脚本来进行指标的收集, 也可以使用zabbix中预定义函数采集指标来实现对指标的采集工作
 
 
 
@@ -550,7 +554,7 @@ ansible_ssh_private_key_file=/path/to/your/.ssh/id_rsa # 私钥
 
 
 
-#### 6.2 示例应用部署及监控
+#### 6.2 示例应用部署及监控(未完成代码编写, 上线时间预计2023.09)
 
 &emsp;&emsp;`zabbix-example-program` 使用来学习上述指标配置方式的示例程序, 由 `mirschao` 使用Vue作为前端并使用Django进行后端开发的, 并根据具体指标体现出来一个综合性项目, 只具备监控方面的参考意义, 不做其他用途; **<u>请在新安装的机器中进行安装</u>**
 
@@ -571,3 +575,80 @@ $ bash installer.sh
 
 
 
+### 7. zabbix报警媒介
+
+- 邮件报警
+- 钉钉报警
+- 飞书报警
+
+
+
+### 8. zabbix结合grafana展示指标图形
+
+```bash
+#> 在zabbix-server机器中安装grafana
+$ yum install -y https://dl.grafana.com/enterprise/release/grafana-enterprise-9.4.7-1.x86_64.rpm
+
+#> 配置grafana的nginx反向代理
+$ vim /etc/grafana/grafana.ini
+[server]
+domain = grafana.qfcc.online
+
+$ vim /etc/opt/rh/rh-nginx116/nginx/conf.d/grafana.conf
+# this is required to proxy Grafana Live WebSocket connections.
+map $http_upgrade $connection_upgrade {
+  default upgrade;
+  '' close;
+}
+
+upstream grafana {
+  server localhost:3000;
+}
+
+server {
+  listen 80;
+  server_name grafana.hiops.icu;
+
+  location / {
+    rewrite ^(.*)$ https://grafana.hiops.icu$1 permanent;
+  }
+}
+
+server {
+  listen 443 ssl;
+  server_name grafana.hiops.icu;
+
+  ssl_certificate     /etc/opt/rh/rh-nginx116/nginx/certs/fullchain1.pem;
+  ssl_certificate_key /etc/opt/rh/rh-nginx116/nginx/certs/privkey1.pem;
+  ssl_protocols       TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
+  ssl_ciphers         HIGH:!aNULL:!MD5;
+  
+  root /usr/share/nginx/html;
+  index index.html index.htm;
+
+  location / {
+    proxy_set_header Host $http_host;
+    proxy_pass http://grafana;
+  }
+
+  # Proxy Grafana Live WebSocket connections.
+  location /api/live/ {
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_set_header Host $http_host;
+    proxy_pass http://grafana;
+  }
+}
+
+$ systemctl restart rh-nginx116-nginx grafana-server
+#> 访问 grafana.qfcc.online 即可登录 grafana ===>>> admin/admin
+
+#> 在zabbix-server中安装zabbix数据源插件, 记得要重启grafana-server服务
+$ grafana-cli plugins install alexanderzobnin-zabbix-app
+✔ Downloaded and extracted alexanderzobnin-zabbix-app v4.3.1 zip successfully to /var/lib/grafana/plugins/alexanderzobnin-zabbix-app
+Please restart Grafana after installing plugins. Refer to Grafana documentation for instructions if necessary.
+$ systemctl restart grafana-server
+```
+
+在grafana界面中将zabbix模版开启, 再到添加数据源中进行添加数据源就好了
