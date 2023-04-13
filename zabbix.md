@@ -95,8 +95,8 @@
 
 **[功能强大且易于扩展的 Zabbix Agent](https://www.zabbix.com/documentation/5.0/zh/manual/concepts/agent)**
 
-- 部署于被监控对象上；
-- 完美支持 Linux 和 Windows ；
+- 部署于被监控对象上
+- 完美支持 Linux 和 Windows 
 
 **[二进制守护进程](https://www.zabbix.com/documentation/5.0/zh/manual/concepts/server)**
 
@@ -113,27 +113,27 @@
 
 ##### Server
 
-[Zabbix server](https://www.zabbix.com/documentation/5.0/zh/manual/concepts/server) 是 Zabbix agent 向其报告可用性、系统完整性信息和统计信息的核心组件。是存储所有配置信息、统计信息和操作信息的核心存储库。
+[Zabbix server](https://www.zabbix.com/documentation/5.0/zh/manual/concepts/server) 是 Zabbix agent 向其报告可用性、系统完整性信息和统计信息的核心组件。是存储所有配置信息、统计信息和操作信息的核心存储库
 
 ##### 数据库
 
-所有配置信息以及 Zabbix 收集到的数据都被存储在数据库中。
+所有配置信息以及 Zabbix 收集到的数据都被存储在数据库中
 
 ##### Web 界面
 
-为了从任何地方和任何平台轻松访问 Zabbix ，我们提供了基于 web 的界面。该界面是 Zabbix server 的一部分，通常（但不一定）和 Zabbix server 运行在同一台物理机器上。
+为了从任何地方和任何平台轻松访问 Zabbix ，我们提供了基于 web 的界面。该界面是 Zabbix server 的一部分，通常（但不一定）和 Zabbix server 运行在同一台物理机器上
 
 ##### Proxy
 
-[Zabbix proxy](https://www.zabbix.com/documentation/5.0/zh/manual/concepts/proxy) 可以替 Zabbix server 收集性能和可用性数据。Zabbix proxy 是 Zabbix 环境部署的可选部分；然而，它对于单个 Zabbix server 负载的分担是非常有益的。
+[Zabbix proxy](https://www.zabbix.com/documentation/5.0/zh/manual/concepts/proxy) 可以替 Zabbix server 收集性能和可用性数据。Zabbix proxy 是 Zabbix 环境部署的可选部分；然而，它对于单个 Zabbix server 负载的分担是非常有益的
 
 ##### Agent
 
-[Zabbix agents](https://www.zabbix.com/documentation/5.0/zh/manual/concepts/agent) 部署在被监控目标上，用于主动监控本地资源和应用程序，并将收集的数据发送给 Zabbix server。
+[Zabbix agents](https://www.zabbix.com/documentation/5.0/zh/manual/concepts/agent) 部署在被监控目标上，用于主动监控本地资源和应用程序，并将收集的数据发送给 Zabbix server
 
 #### 数据流
 
-此外，重要的是，需要回过头来了解下 Zabbix 内部的整体数据流。首先，为了创建一个采集数据的监控项，您就必须先创建主机。其次，必须有一个监控项来创建触发器。最后，您必须有一个触发器来创建一个动作，这几个点构成了一个完整的数据流。因此，如果您想要收到 CPU load it too high on *Server X* 的告警，您必须首先为 *Server X* 创建一个主机条目，其次创建一个用于监视其 CPU 的监控项，最后创建一个触发器，用来触发 CPU is too high 这个动作，并将其发送到您的邮箱里。虽然这些步骤看起来很繁琐，但是使用模板的话，其实并不复杂。也正是由于这种设计，使得 Zabbix 的配置变得更加灵活易用。
+此外，重要的是，需要回过头来了解下 Zabbix 内部的整体数据流。首先，为了创建一个采集数据的监控项，您就必须先创建主机。其次，必须有一个监控项来创建触发器。最后，您必须有一个触发器来创建一个动作，这几个点构成了一个完整的数据流。因此，如果您想要收到 CPU load it too high on *Server X* 的告警，您必须首先为 *Server X* 创建一个主机条目，其次创建一个用于监视其 CPU 的监控项，最后创建一个触发器，用来触发 CPU is too high 这个动作，并将其发送到您的邮箱里。虽然这些步骤看起来很繁琐，但是使用模板的话，其实并不复杂。也正是由于这种设计，使得 Zabbix 的配置变得更加灵活易用
 
 
 
@@ -454,4 +454,15 @@ ansible_ssh_private_key_file=/path/to/your/.ssh/id_rsa # 私钥
 执行 `ansible-playbook -i hosts main.yml` 即可将目标主机安装好 zabbix-agent, 配合server端做好的自动注册, 每启动一台 zabbix-agent 即可注册到server平台
 
 
+
+### 6. Zabbix监控配置
+
+&emsp;&emsp;对于日常运维过程中, 针对于前端或者后端的程序而言, 在开发的过程中需要暴露出探测的接口, 从而保障在应用运行的过程中来提取其内部的运行情况, 同时对于不同的服务还要根据所在系统中的cpu、memory、IO等指标的使用情况来断定服务的稳定性; 同样的针对于大型的应用而言, 可能采用多个接口相互配合完成整体的功能, 那么对于接口的响应时间以及是否存活也是要监控的指标;
+
+&emsp;&emsp;在zabbix中配置监控项的话, 大多数采用自定义监控模版的方式对监控指标进行分类, 将各个不同类型的指标放入到不同的监控模版中, 从而在未来使用模版绑定到被监控主机上, 来达到监控主机的目的; 同时也能配合自动注册功能将通用监控模版在注册过程中绑定到主机上, 从而达成自动化的需求;
+
+监控模版包含监控项、监控项图形、触发器 三个核心的配置; 而监控模版分为内建模版和自定义模版两种; 内建模版有很多可以在菜单中的 "configuration" -->> "templates" 里面进行查看, 各式各样的监控模版都已经内置好了, 直接关联到对应的主机即可, 几乎是开箱即用; 而对于运维日常维护的线上业务而言, 每家公司都是不同的, 所以无法定向生成模版, 需要运维人员对具体的指标设定具体的采集方式, 并体现出相关指标的数据, 从而进行监控, 我们称这种监控方式为自定义模版;
+
+- 普通主机增加模版进行监控(手动添加&自动注册)
+- 业务服务增加自定义模版进行监控
 
