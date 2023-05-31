@@ -239,7 +239,7 @@ server.port: 5601
 server.host: "10.9.12.61"
 server.basePath: "/kibana"
 server.rewriteBasePath: true
-server.publicBaseUrl: "https://kibana.hiops.icu/kibana"
+server.publicBaseUrl: "https://kibana.你的二级域/kibana"
 server.ssl.enabled: true
 server.ssl.certificate: /etc/kibana/certs/fullchain1.pem
 server.ssl.key: /etc/kibana/certs/privkey1.pem
@@ -266,7 +266,7 @@ $ chown -R kibana:kibana /etc/kibana/certs/
 $ systemctl enable --now kibana
 ```
 
-做好DNS解析, 并访问 `https://kibana.hiops.icu:5601/kibana`即可访问到界面, 在界面中使用 `elastic` 用户登陆即可
+做好DNS解析, 并访问 `https://kibana.你的二级域:5601/kibana`即可访问到界面, 在界面中使用 `elastic` 用户登陆即可
 
 
 
@@ -322,8 +322,6 @@ log.retention.check.interval.ms=300000
 
 $ bin/kafka-storage.sh format -t ZfqgKzrHR1SqbBwOr3Iolw -c config/kraft/server.properties
 Formatting /tmp/kraft-combined-logs
-
-$ bin/kafka-server-start.sh config/kraft/server.properties
 ```
 
 在测试能够正常启动后, 将上方进程放入到systemd中进行管理
@@ -357,6 +355,9 @@ $ bin/kafka-topics.sh --create \
 --topic test \
 --bootstrap-server 10.9.12.62:9092
 Created topic test.
+
+$ bin/kafka-topics.sh --list --bootstrap-server 10.9.12.62:9092
+test
 ```
 
 
@@ -478,19 +479,6 @@ $ systemctl enable --now filebeat
 &emsp;&emsp;配置采集 nginx 服务器的日志, 并设定filebeat配置文件的采集源(/var/log/nginx/access.log)及输送源(Kafka), 这里filebeat使用单一的日志源作为采集源, 也可以使用正则表达式的方式来匹配不同类型、不同虚拟主机的日志, 同样的Kafka的topic也可以自动的生成对应的topic从而再经过配置logstash来输送数据到elasticsearch中进行存储
 
 ```bash
-$ vim /etc/filebeat/filebeat.yml
-filebeat.inputs:
- - type: log
-   tail_files: true
-   backoff: "1s"
-   paths:
-      - /var/log/nginx/access.log
-
-output:
-  kafka:
-    hosts: ["10.9.12.62:9092", "10.9.12.63:9092"]
-    topic: currency
-
 $ egrep -v "(^$|^#|#)" /etc/filebeat/filebeat.yml
 filebeat.inputs:
 - type: log
@@ -519,4 +507,3 @@ processors:
 
 $ systemctl enable --now filebeat
 ```
-
