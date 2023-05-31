@@ -470,8 +470,11 @@ input {
 
 filter {
   grok {
-    patterns => "/usr/share/logstash/vendor/bundle/jruby/2.6.0/gems/logstash-patterns-core-4.3.4/patterns"
+    patterns_dir => "/usr/share/logstash/vendor/bundle/jruby/2.6.0/gems/logstash-patterns-core-4.3.4/patterns"
     match => { "message" => "%{NGINXACCESS}" }
+  }
+  mutate {
+    remove_field => ["request_agent"]
   }
 }
 
